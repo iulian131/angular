@@ -16,7 +16,7 @@ describe("Scope", function() {
 		});
 
 		it("calls the listener function of a watch on first $digest", function() {
-			var watchFn = function() {return "test";}
+			var watchFn = function() {return "test";};
 			var listenerFn = jasmine.createSpy();
 			
 			scope.$watch(watchFn, listenerFn);
@@ -195,7 +195,7 @@ describe("Scope", function() {
 				return scope.aValue;
 			}, function(newVal, oldVal, scope) {
 				scope.count++;
-			})
+			});
 			
 			scope.$evalAsync(function(){});
 			
@@ -269,7 +269,7 @@ describe("Scope", function() {
 				return scope.aValue;
 			}, function(newVal, oldVal, scope) {
 				scope.count++;
-			})
+			});
 			
 			scope.$evalAsync(function(){
 				throw "Error";
@@ -318,6 +318,56 @@ describe("Scope", function() {
 			destroy();
 			scope.$digest();
 			expect(scope.count).toBe(1);
+		});
+		
+		it("Allow async $apply with $applyAsync", function() {
+			scope.aValue = 1;
+			scope.count = 0;
+			
+			scope.$watch(function(scope) {
+				return scope.aValue;
+			}, function(newVal, oldVal, scope) {
+				scope.count++;
+			});
+			
+			expect(scope.count).toBe(0);
+			scope.$apply();
+			expect(scope.count).toBe(1);
+			
+			scope.$applyAsync(function(scope){
+				scope.aValue = 2;
+			});
+			
+			expect(scope.count).toBe(1);
+			jasmine.clock().tick(100);
+			expect(scope.count).toBe(2);
+		});
+		
+		it("Store multiple applyAsyncs", function() {
+			scope.aValue = 1;
+			scope.count = 0;
+			
+			scope.$watch(function(scope) {
+				return scope.aValue;
+			}, function(newVal, oldVal, scope) {
+				scope.count++;
+			});
+			
+			expect(scope.count).toBe(0);
+			scope.$apply();
+			expect(scope.count).toBe(1);
+			
+			scope.$applyAsync(function(scope){
+				scope.aValue = 2;
+			});
+			
+			scope.$applyAsync(function(scope){
+				scope.aValue = 3;
+			});
+			
+			expect(scope.count).toBe(1);
+			jasmine.clock().tick(100);
+			expect(scope.count).toBe(2);
 		});
 	});
 });

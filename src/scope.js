@@ -3,6 +3,8 @@ var Scope = function(){
 	this.$$maxDigestLoops = 10;
 	this.$$lastDirtyWatch = null;
 	this.$$asyncQueue = [];
+	this.$$applyAsyncQueue = [];
+	this.$$applyAsyncId = null;
 	this.$$postDigestQueue = [];
 	this.$$phase = null;
 };
@@ -21,12 +23,13 @@ Scope.prototype.$clearPhase = function() {
 Scope.prototype.$watch = function(watchFn, listenerFn, valueEq) {
 	//Urmareste o functie
 	var self = this;
+	this.$$lastDirtyWatch = null;
 	var watcher = {
 		watchFn: watchFn,
 		listenerFn: listenerFn || function() {},
 		oldValue: undefined,
 		valueEq: !!valueEq
-	}
+	};
 	
 	self.$$watchers.push(watcher);
 	
@@ -36,7 +39,7 @@ Scope.prototype.$watch = function(watchFn, listenerFn, valueEq) {
 			self.$$watchers.splice(index, 1);
 		}
 		this.$$lastDirtyWatch = null;
-	}
+	};
 };
 
 Scope.prototype.$$areEqual = function(newVal, oldVal, valueEq) {
@@ -79,6 +82,12 @@ Scope.prototype.$digest = function() {
 	var numberOfDigests=0;//Numarul de verificari integrale a functiilor urmarite
 	this.$$lastDirtyWatch = null;
 	this.$beginPhase("$digest");
+	
+	if(this.$$applyAsyncId) {
+		clearTimeout(this.$$applyAsyncId);
+		this.$$flushApplyAsync();
+	}
+	
 	do {
 		while(this.$$asyncQueue.length) {
 			var evalAsync = this.$$asyncQueue.shift();
@@ -87,7 +96,7 @@ Scope.prototype.$digest = function() {
 			}catch(e){
 				console.log(e);
 			}
-		};
+		}
 		numberOfDigests++;
 		dirty = this.$$digestOnce();
 		
@@ -146,5 +155,24 @@ Scope.prototype.$apply = function(fn, args) {
 	}finally{
 		this.$clearPhase();
 		this.$digest();
+	}
+};
+
+Scope.prototype.$$flushApplyAsync = function() {
+	while(this.$$applyAsyncQueue.length) {
+		this.$$applyAsyncQueue.shift()();
+	}
+	this.$$applyAsyncId = null;
+};
+
+Scope.prototype.$applyAsync = function(fn, args) {
+	var self = this;
+	self.$$applyAsyncQueue.push(function() {
+		self.$eval(fn, args);
+	});
+	if(self.$$applyAsyncId === null) {
+		self.$$applyAsyncId = setTimeout(function() {
+			self.$apply(_.bind(self.$$flushApplyAsync, self));
+		},0);
 	}
 };
